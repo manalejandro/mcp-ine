@@ -26,6 +26,320 @@ app.use(cors({
 app.use(express.json());
 app.use(express.text());
 
+// Página principal con información de la API
+app.get('/', (req: Request, res: Response) => {
+  const baseUrl = req.protocol + '://' + req.get('host');
+  res.send(`
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP INE Server - API del Instituto Nacional de Estadística</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6; 
+      color: #333; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { 
+      max-width: 1200px; 
+      margin: 0 auto; 
+      background: white; 
+      border-radius: 12px; 
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; 
+      padding: 40px; 
+      text-align: center; 
+    }
+    .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .header p { font-size: 1.2em; opacity: 0.95; }
+    .content { padding: 40px; }
+    .section { margin-bottom: 40px; }
+    .section h2 { 
+      color: #667eea; 
+      margin-bottom: 20px; 
+      padding-bottom: 10px; 
+      border-bottom: 3px solid #667eea;
+      font-size: 1.8em;
+    }
+    .section h3 { 
+      color: #764ba2; 
+      margin: 20px 0 10px; 
+      font-size: 1.3em;
+    }
+    .endpoints { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+      gap: 20px; 
+      margin-top: 20px; 
+    }
+    .endpoint { 
+      background: #f8f9fa; 
+      padding: 20px; 
+      border-radius: 8px; 
+      border-left: 4px solid #667eea;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .endpoint:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+    }
+    .endpoint .method { 
+      display: inline-block;
+      padding: 4px 12px; 
+      border-radius: 4px; 
+      font-weight: bold; 
+      font-size: 0.85em;
+      margin-bottom: 10px;
+    }
+    .method.get { background: #28a745; color: white; }
+    .method.post { background: #007bff; color: white; }
+    .endpoint code { 
+      display: block;
+      background: #2d3748; 
+      color: #68d391; 
+      padding: 12px; 
+      border-radius: 6px; 
+      margin: 10px 0;
+      font-size: 0.9em;
+      overflow-x: auto;
+    }
+    .endpoint p { 
+      color: #666; 
+      font-size: 0.95em;
+      margin-top: 8px;
+    }
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .tool-card {
+      background: #f0f4ff;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 3px solid #764ba2;
+    }
+    .tool-card strong {
+      color: #764ba2;
+      display: block;
+      margin-bottom: 5px;
+      font-size: 1.05em;
+    }
+    .tool-card small {
+      color: #555;
+      font-size: 0.9em;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-card .number {
+      font-size: 2.5em;
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .stat-card .label {
+      font-size: 1em;
+      opacity: 0.9;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: bold;
+      margin: 5px;
+    }
+    .badge.mcp { background: #667eea; color: white; }
+    .badge.rest { background: #28a745; color: white; }
+    .badge.swagger { background: #ff9800; color: white; }
+    a { color: #667eea; text-decoration: none; font-weight: 500; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🚀 MCP INE Server</h1>
+      <p>API del Instituto Nacional de Estadística de España</p>
+      <p>
+        <span class="badge mcp">MCP Protocol</span>
+        <span class="badge rest">REST API</span>
+        <span class="badge swagger">Swagger Docs</span>
+      </p>
+    </div>
+    
+    <div class="content">
+      <div class="section">
+        <h2>📊 Estadísticas del Servidor</h2>
+        <div class="stats">
+          <div class="stat-card">
+            <span class="number">${tools.length}</span>
+            <span class="label">Herramientas MCP</span>
+          </div>
+          <div class="stat-card">
+            <span class="number">24</span>
+            <span class="label">Endpoints INE</span>
+          </div>
+          <div class="stat-card">
+            <span class="number">3</span>
+            <span class="label">Protocolos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🔌 Endpoints MCP (Model Context Protocol)</h2>
+        <div class="endpoints">
+          <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>${baseUrl}/mcp/v1</code>
+            <p><strong>JSON-RPC Endpoint</strong> - Endpoint principal para MCP sobre HTTP usando JSON-RPC 2.0. Este es el endpoint recomendado para la mayoría de clientes.</p>
+          </div>
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>${baseUrl}/mcp/v1/sse</code>
+            <p><strong>Conexión SSE</strong> - Endpoint alternativo para conexión MCP con Server-Sent Events (experimental).</p>
+          </div>
+        </div>
+        
+        <h3>📝 Configuración para VS Code AI Toolkit</h3>
+        <div class="endpoint">
+          <code>{
+  "mcpServers": {
+    "mcp-ine": {
+      "url": "${baseUrl}/mcp/v1",
+      "transport": "http"
+    }
+  }
+}</code>
+          <p>Agrega esta configuración a <strong>~/.aitk/mcp.json</strong></p>
+        </div>
+        
+        <h3>🧪 Probar el Endpoint</h3>
+        <div class="endpoint">
+          <code>curl -X POST ${baseUrl}/mcp/v1 \\
+  -H "Content-Type: application/json" \\
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{},"id":1}'</code>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🛠️ Herramientas MCP Disponibles</h2>
+        <p>El servidor expone ${tools.length} herramientas para consultar datos del INE:</p>
+        <div class="tools-grid">
+          ${tools.map(tool => `
+            <div class="tool-card">
+              <strong>${tool.name}</strong>
+              <small>${tool.description}</small>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>📚 Documentación y APIs</h2>
+        <div class="endpoints">
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code><a href="${baseUrl}/api-docs" target="_blank">${baseUrl}/api-docs</a></code>
+            <p><strong>Swagger UI</strong> - Documentación interactiva completa de la API REST con todos los endpoints disponibles.</p>
+          </div>
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code><a href="${baseUrl}/health" target="_blank">${baseUrl}/health</a></code>
+            <p><strong>Health Check</strong> - Verifica el estado del servidor.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🌐 API REST Directa</h2>
+        <p>Además del protocolo MCP, puedes acceder directamente a los datos mediante endpoints REST:</p>
+        <div class="endpoints">
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/operaciones-disponibles</code>
+            <p>Lista todas las operaciones estadísticas disponibles</p>
+          </div>
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/operacion/:idOperacion</code>
+            <p>Información detallada de una operación (ej: IPC, EPA)</p>
+          </div>
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/datos-tabla/:idTabla</code>
+            <p>Datos completos de una tabla estadística</p>
+          </div>
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/datos-serie/:idSerie</code>
+            <p>Datos de una serie temporal específica</p>
+          </div>
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/variables</code>
+            <p>Lista todas las variables estadísticas</p>
+          </div>
+          <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/series-operacion/:idOperacion</code>
+            <p>Todas las series de una operación</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>💡 Ejemplos de Uso</h2>
+        
+        <h3>Consulta directa con curl:</h3>
+        <div class="endpoint">
+          <code>curl "${baseUrl}/api/operaciones-disponibles?idioma=ES"</code>
+        </div>
+        
+        <h3>Consulta mediante MCP:</h3>
+        <div class="endpoint">
+          <code>// Usa la herramienta ine_operaciones_disponibles
+// desde tu cliente MCP (VS Code AI Toolkit, etc.)</code>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>ℹ️ Información</h2>
+        <p><strong>Servidor:</strong> MCP INE Server v1.0.0</p>
+        <p><strong>Protocolo:</strong> Model Context Protocol (MCP) + REST API</p>
+        <p><strong>Fuente de datos:</strong> <a href="https://www.ine.es" target="_blank">Instituto Nacional de Estadística (INE)</a></p>
+        <p><strong>Documentación MCP:</strong> <a href="https://modelcontextprotocol.io" target="_blank">modelcontextprotocol.io</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `);
+});
+
 // Swagger Documentation
 app.use('/api-docs', ...swaggerUi.serve as any);
 app.get('/api-docs', swaggerUi.setup(swaggerSpec) as any);
@@ -35,7 +349,18 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    service: 'MCP INE Server'
+    service: 'MCP INE Server',
+    version: '1.0.0',
+    tools: tools.length,
+    endpoints: {
+      mcp: '/mcp/v1',
+      mcp_sse: '/mcp/v1/sse',
+      mcp_message: '/mcp/v1/message',
+      swagger: '/api-docs',
+      health: '/health'
+    },
+    protocol: 'JSON-RPC 2.0',
+    mcp_version: '2024-11-05'
   });
 });
 
@@ -505,8 +830,126 @@ function createMCPServer(): Server {
 }
 
 /**
+ * Endpoint MCP JSON-RPC directo (más compatible y simple)
+ */
+app.post('/mcp/v1', async (req: Request, res: Response) => {
+  console.log('MCP JSON-RPC Request:', req.body);
+  
+  try {
+    const { jsonrpc, method, params, id } = req.body;
+
+    // Validar JSON-RPC 2.0
+    if (jsonrpc !== '2.0') {
+      return res.status(400).json({
+        jsonrpc: '2.0',
+        error: { 
+          code: -32600, 
+          message: 'Invalid Request: jsonrpc must be "2.0"' 
+        },
+        id: id || null
+      });
+    }
+
+    // Initialize - Handshake inicial de MCP
+    if (method === 'initialize') {
+      return res.json({
+        jsonrpc: '2.0',
+        result: {
+          protocolVersion: '2024-11-05',
+          serverInfo: {
+            name: 'ine-mcp-server',
+            version: '1.0.0'
+          },
+          capabilities: {
+            tools: {}
+          }
+        },
+        id
+      });
+    }
+
+    // Initialized - Confirmación del cliente
+    if (method === 'notifications/initialized') {
+      console.log('Cliente MCP inicializado');
+      return res.status(204).send();
+    }
+
+    // Listar herramientas
+    if (method === 'tools/list') {
+      return res.json({
+        jsonrpc: '2.0',
+        result: { tools },
+        id
+      });
+    }
+
+    // Llamar a una herramienta
+    if (method === 'tools/call') {
+      const { name, arguments: args } = params || {};
+      
+      if (!name) {
+        return res.status(400).json({
+          jsonrpc: '2.0',
+          error: { 
+            code: -32602, 
+            message: 'Invalid params: name is required' 
+          },
+          id
+        });
+      }
+
+      const result = await handleToolCall(name, args || {});
+      
+      return res.json({
+        jsonrpc: '2.0',
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        },
+        id
+      });
+    }
+
+    // Ping/Pong
+    if (method === 'ping') {
+      return res.json({
+        jsonrpc: '2.0',
+        result: {},
+        id
+      });
+    }
+
+    // Método no soportado
+    return res.status(404).json({
+      jsonrpc: '2.0',
+      error: { 
+        code: -32601, 
+        message: `Method not found: ${method}` 
+      },
+      id
+    });
+
+  } catch (error: any) {
+    console.error('Error en MCP:', error);
+    return res.status(500).json({
+      jsonrpc: '2.0',
+      error: { 
+        code: -32603, 
+        message: error.message || 'Internal error',
+        data: { stack: error.stack }
+      },
+      id: req.body.id || null
+    });
+  }
+});
+
+/**
  * Endpoint MCP HTTP con SSE (Server-Sent Events)
- * Este es el protocolo oficial de MCP para HTTP
+ * Alternativa para clientes que prefieren SSE
  */
 app.get('/mcp/v1/sse', async (req: Request, res: Response) => {
   console.log('Nueva conexión SSE MCP');
@@ -536,7 +979,6 @@ app.get('/mcp/v1/sse', async (req: Request, res: Response) => {
 app.post('/mcp/v1/message', async (req: Request, res: Response) => {
   try {
     // Este endpoint es manejado internamente por SSEServerTransport
-    // Solo necesitamos asegurarnos de que el body parser esté configurado
     res.status(202).json({ received: true });
   } catch (error: any) {
     console.error('Error procesando mensaje:', error);
@@ -589,10 +1031,13 @@ app.get('/api/tablas-operacion/:idOperacion', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 MCP INE Server ejecutándose en http://localhost:${PORT}`);
   console.log(`📚 Documentación Swagger: http://localhost:${PORT}/api-docs`);
-  console.log(`🔧 Endpoint MCP SSE: http://localhost:${PORT}/mcp/v1/sse`);
-  console.log(`📨 Endpoint MCP Message: http://localhost:${PORT}/mcp/v1/message`);
+  console.log(`🔧 Endpoint MCP JSON-RPC: POST http://localhost:${PORT}/mcp/v1`);
+  console.log(`🔧 Endpoint MCP SSE: GET http://localhost:${PORT}/mcp/v1/sse`);
+  console.log(`📨 Endpoint MCP Message: POST http://localhost:${PORT}/mcp/v1/message`);
   console.log(`💚 Health check: http://localhost:${PORT}/health`);
   console.log(`\n📋 Herramientas disponibles: ${tools.length}`);
+  console.log(`\n🔗 Configuración AI Toolkit:`);
+  console.log(`   {"mcpServers": {"mcp-ine": {"url": "http://localhost:${PORT}/mcp/v1", "transport": "http"}}}`);
 });
 
 // Para uso con stdio (AI Toolkit local)
