@@ -3,6 +3,7 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -16,8 +17,14 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept'],
+  credentials: false
+}));
 app.use(express.json());
+app.use(express.text());
 
 // Swagger Documentation
 app.use('/api-docs', ...swaggerUi.serve as any);
@@ -459,62 +466,81 @@ async function handleToolCall(name: string, args: any): Promise<any> {
 }
 
 /**
- * Endpoint JSON-RPC para MCP
+ * Crea un servidor MCP con los handlers configurados
  */
-app.post('/mcp/v1', async (req: Request, res: Response) => {
+function createMCPServer(): Server {
+  const server = new Server(
+    {
+      name: 'ine-mcp-server',
+      version: '1.0.0',
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
+
+  // Registrar handler para listar herramientas
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools
+  }));
+
+  // Registrar handler para llamar herramientas
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const result = await handleToolCall(name, args || {});
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
+    };
+  });
+
+  return server;
+}
+
+/**
+ * Endpoint MCP HTTP con SSE (Server-Sent Events)
+ * Este es el protocolo oficial de MCP para HTTP
+ */
+app.get('/mcp/v1/sse', async (req: Request, res: Response) => {
+  console.log('Nueva conexión SSE MCP');
+  
   try {
-    const { jsonrpc, method, params, id } = req.body;
-
-    if (jsonrpc !== '2.0') {
-      return res.status(400).json({
-        jsonrpc: '2.0',
-        error: { code: -32600, message: 'Invalid Request' },
-        id: null
-      });
-    }
-
-    // Listar herramientas
-    if (method === 'tools/list') {
-      return res.json({
-        jsonrpc: '2.0',
-        result: { tools },
-        id
-      });
-    }
-
-    // Llamar a una herramienta
-    if (method === 'tools/call') {
-      const { name, arguments: args } = params;
-      const result = await handleToolCall(name, args || {});
-      
-      return res.json({
-        jsonrpc: '2.0',
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(result, null, 2)
-            }
-          ]
-        },
-        id
-      });
-    }
-
-    // Método no soportado
-    return res.status(404).json({
-      jsonrpc: '2.0',
-      error: { code: -32601, message: 'Method not found' },
-      id
+    const server = createMCPServer();
+    const transport = new SSEServerTransport('/mcp/v1/message', res);
+    
+    await server.connect(transport);
+    
+    // La conexión se mantiene abierta hasta que el cliente se desconecte
+    req.on('close', () => {
+      console.log('Conexión SSE cerrada');
+      server.close().catch(console.error);
     });
-
   } catch (error: any) {
-    console.error('Error en MCP:', error);
-    return res.status(500).json({
-      jsonrpc: '2.0',
-      error: { code: -32603, message: error.message || 'Internal error' },
-      id: req.body.id || null
-    });
+    console.error('Error en conexión SSE:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+/**
+ * Endpoint para mensajes MCP (usado por SSE transport)
+ */
+app.post('/mcp/v1/message', async (req: Request, res: Response) => {
+  try {
+    // Este endpoint es manejado internamente por SSEServerTransport
+    // Solo necesitamos asegurarnos de que el body parser esté configurado
+    res.status(202).json({ received: true });
+  } catch (error: any) {
+    console.error('Error procesando mensaje:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -563,43 +589,15 @@ app.get('/api/tablas-operacion/:idOperacion', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 MCP INE Server ejecutándose en http://localhost:${PORT}`);
   console.log(`📚 Documentación Swagger: http://localhost:${PORT}/api-docs`);
-  console.log(`🔧 Endpoint MCP JSON-RPC: http://localhost:${PORT}/mcp/v1`);
+  console.log(`🔧 Endpoint MCP SSE: http://localhost:${PORT}/mcp/v1/sse`);
+  console.log(`📨 Endpoint MCP Message: http://localhost:${PORT}/mcp/v1/message`);
   console.log(`💚 Health check: http://localhost:${PORT}/health`);
+  console.log(`\n📋 Herramientas disponibles: ${tools.length}`);
 });
 
-// Para uso con stdio (AI Toolkit)
+// Para uso con stdio (AI Toolkit local)
 export async function runStdioServer() {
-  const server = new Server(
-    {
-      name: 'ine-mcp-server',
-      version: '1.0.0',
-    },
-    {
-      capabilities: {
-        tools: {},
-      },
-    }
-  );
-
-  // Registrar handlers
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools
-  }));
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-    const result = await handleToolCall(name, args || {});
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }
-      ]
-    };
-  });
-
+  const server = createMCPServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   
