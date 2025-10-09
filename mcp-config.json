@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "ine-server": {
+      "command": "node",
+      "args": ["dist/index.js", "--stdio"],
+      "description": "Servidor MCP para consultar la API del INE (Instituto Nacional de Estadística de España)",
+      "env": {}
+    },
+    "ine-server-http": {
+      "url": "http://localhost:3000/mcp/v1",
+      "transport": "http",
+      "description": "Servidor MCP INE vía HTTP JSON-RPC",
+      "env": {}
+    },
+    "ine-server-sse": {
+      "url": "http://localhost:3001/sse",
+      "transport": "sse",
+      "description": "Servidor MCP INE vía SSE (Server-Sent Events)",
+      "env": {}
+    }
+  }
+}
