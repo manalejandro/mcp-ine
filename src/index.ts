@@ -833,10 +833,13 @@ function createMCPServer(): Server {
  * Endpoint MCP JSON-RPC directo (más compatible y simple)
  */
 app.post('/mcp/v1', async (req: Request, res: Response) => {
-  console.log('MCP JSON-RPC Request:', req.body);
+  console.log('MCP JSON-RPC Request:', JSON.stringify(req.body, null, 2));
   
   try {
     const { jsonrpc, method, params, id } = req.body;
+
+    // Establecer headers correctos
+    res.setHeader('Content-Type', 'application/json');
 
     // Validar JSON-RPC 2.0
     if (jsonrpc !== '2.0') {
@@ -852,7 +855,8 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
 
     // Initialize - Handshake inicial de MCP
     if (method === 'initialize') {
-      return res.json({
+      console.log('MCP Initialize received');
+      return res.status(200).json({
         jsonrpc: '2.0',
         result: {
           protocolVersion: '2024-11-05',
@@ -868,15 +872,16 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
       });
     }
 
-    // Initialized - Confirmación del cliente
+    // Initialized - Confirmación del cliente (es una notificación, no requiere respuesta)
     if (method === 'notifications/initialized') {
       console.log('Cliente MCP inicializado');
-      return res.status(204).send();
+      return res.status(200).json({});
     }
 
     // Listar herramientas
     if (method === 'tools/list') {
-      return res.json({
+      console.log('MCP tools/list received');
+      return res.status(200).json({
         jsonrpc: '2.0',
         result: { tools },
         id
@@ -886,6 +891,8 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
     // Llamar a una herramienta
     if (method === 'tools/call') {
       const { name, arguments: args } = params || {};
+      
+      console.log(`MCP tools/call: ${name}`, args);
       
       if (!name) {
         return res.status(400).json({
@@ -900,7 +907,9 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
 
       const result = await handleToolCall(name, args || {});
       
-      return res.json({
+      console.log(`MCP tools/call result for ${name}: success`);
+      
+      return res.status(200).json({
         jsonrpc: '2.0',
         result: {
           content: [
@@ -916,7 +925,7 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
 
     // Ping/Pong
     if (method === 'ping') {
-      return res.json({
+      return res.status(200).json({
         jsonrpc: '2.0',
         result: {},
         id
@@ -924,7 +933,8 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
     }
 
     // Método no soportado
-    return res.status(404).json({
+    console.log(`MCP method not found: ${method}`);
+    return res.status(200).json({
       jsonrpc: '2.0',
       error: { 
         code: -32601, 
@@ -935,7 +945,7 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
 
   } catch (error: any) {
     console.error('Error en MCP:', error);
-    return res.status(500).json({
+    return res.status(200).json({
       jsonrpc: '2.0',
       error: { 
         code: -32603, 

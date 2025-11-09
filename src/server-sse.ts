@@ -12,11 +12,13 @@ import type { Idioma } from './types/ine.types.js';
 const PORT = process.env.PORT || 3001;
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept'],
+  credentials: false
+}));
 app.use(express.json());
-
-// Almacenamiento de sesiones SSE
-const sessions = new Map<string, { server: Server; transport: SSEServerTransport }>();
 
 /**
  * Maneja las llamadas a las herramientas MCP
@@ -128,73 +130,86 @@ const tools = [
  * Endpoint SSE para conexión MCP
  */
 app.get('/sse', async (req: Request, res: Response) => {
-  const sessionId = Math.random().toString(36).substring(7);
-
-  // Configurar SSE
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
-  });
-
-  // Crear servidor MCP
-  const server = new Server(
-    {
-      name: 'ine-mcp-server-sse',
-      version: '1.0.0',
-    },
-    {
-      capabilities: {
-        tools: {},
+  console.log('Nueva conexión SSE iniciada');
+  
+  try {
+    // Crear servidor MCP
+    const server = new Server(
+      {
+        name: 'ine-mcp-server-sse',
+        version: '1.0.0',
       },
-    }
-  );
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
 
-  // Registrar handlers
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+    // Registrar handlers
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+      console.log('SSE: ListTools request received');
+      return { tools };
+    });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-    const result = await handleToolCall(name, args || {});
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      console.log(`SSE: CallTool request - ${name}`, args);
+      
+      const result = await handleToolCall(name, args || {});
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2)
+          }
+        ]
+      };
+    });
+
+    // Crear transporte SSE - este configura los headers automáticamente
+    const transport = new SSEServerTransport('/message', res);
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }
-      ]
-    };
-  });
+    // Conectar servidor con transporte
+    await server.connect(transport);
+    
+    console.log('SSE: Servidor MCP conectado');
 
-  // Crear transporte SSE
-  const transport = new SSEServerTransport('/messages', res);
-  await server.connect(transport);
+    // Manejar cierre de conexión
+    req.on('close', () => {
+      console.log('SSE: Conexión cerrada por el cliente');
+      server.close().catch(err => console.error('Error cerrando servidor:', err));
+    });
 
-  sessions.set(sessionId, { server, transport });
-
-  // Limpiar al cerrar conexión
-  req.on('close', () => {
-    sessions.delete(sessionId);
-    console.log(`Sesión SSE cerrada: ${sessionId}`);
-  });
-
-  console.log(`Nueva sesión SSE iniciada: ${sessionId}`);
+  } catch (error: any) {
+    console.error('Error en conexión SSE:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: error.message,
+        stack: error.stack 
+      });
+    }
+  }
 });
 
 /**
  * Endpoint para enviar mensajes (POST)
+ * Este endpoint recibe los mensajes JSON-RPC del cliente
  */
-app.post('/messages', async (req: Request, res: Response) => {
+app.post('/message', express.json(), async (req: Request, res: Response) => {
+  console.log('SSE Message received:', JSON.stringify(req.body, null, 2));
+  
   try {
-    // Este endpoint procesa mensajes enviados por el cliente
-    const message = req.body;
-    console.log('Mensaje recibido:', message);
-    
-    res.json({ success: true });
+    // El SDK de MCP maneja esto internamente a través del SSEServerTransport
+    // Solo necesitamos confirmar la recepción
+    res.status(202).json({ received: true });
   } catch (error: any) {
-    console.error('Error procesando mensaje:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error procesando mensaje SSE:', error);
+    res.status(500).json({ 
+      error: error.message,
+      stack: error.stack 
+    });
   }
 });
 
@@ -203,8 +218,14 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     transport: 'SSE',
-    sessions: sessions.size,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    service: 'MCP INE Server (SSE)',
+    version: '1.0.0',
+    endpoints: {
+      sse: '/sse',
+      message: '/message',
+      health: '/health'
+    }
   });
 });
 
