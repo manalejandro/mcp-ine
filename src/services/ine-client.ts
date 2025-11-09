@@ -72,16 +72,37 @@ export class INEClient {
    */
   private async get<T>(url: string): Promise<INEResponse<T>> {
     try {
+      const fullUrl = `${this.baseURL}${url}`;
+      console.log(`INE API Request: ${fullUrl}`);
       const response = await this.client.get<T>(url);
       return {
         data: response.data,
         success: true
       };
     } catch (error: any) {
+      const fullUrl = `${this.baseURL}${url}`;
+      let errorMessage = error.message || 'Error desconocido';
+      
+      // Proporcionar mensajes de error más útiles
+      if (error.response?.status === 404) {
+        errorMessage = `Recurso no encontrado (404). La URL solicitada no existe: ${fullUrl}. ` +
+          `Verifica que el ID proporcionado sea correcto. ` +
+          `Usa 'ine_operaciones_disponibles' para listar operaciones disponibles, ` +
+          `o 'ine_tablas_operacion' para listar las tablas de una operación específica.`;
+      } else if (error.response?.status === 400) {
+        errorMessage = `Solicitud incorrecta (400). Los parámetros enviados no son válidos: ${fullUrl}`;
+      } else if (error.response?.status >= 500) {
+        errorMessage = `Error del servidor INE (${error.response.status}). El servicio podría estar temporalmente no disponible.`;
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = `Tiempo de espera agotado. El servidor INE no respondió en 30 segundos.`;
+      }
+      
+      console.error(`INE API Error: ${errorMessage}`);
+      
       return {
         data: null as any,
         success: false,
-        error: error.message || 'Error desconocido'
+        error: errorMessage
       };
     }
   }
