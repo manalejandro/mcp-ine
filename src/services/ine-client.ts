@@ -43,9 +43,15 @@ export class INEClient {
   }
 
   /**
-   * Construye la URL con parámetros
+   * Construye la URL con parámetros, excluyendo parámetros que ya están en la ruta
    */
-  private buildURL(idioma: Idioma, funcion: string, input?: string, params?: Record<string, any>): string {
+  private buildURL(
+    idioma: Idioma, 
+    funcion: string, 
+    input?: string, 
+    params?: Record<string, any>,
+    excludeParams?: string[]
+  ): string {
     let url = `/${idioma}/${funcion}`;
     if (input) {
       url += `/${input}`;
@@ -53,11 +59,18 @@ export class INEClient {
     
     if (params && Object.keys(params).length > 0) {
       const queryParams = new URLSearchParams();
+      const paramsToExclude = new Set([
+        'idioma', // Siempre excluir idioma (está en la ruta)
+        ...(excludeParams || [])
+      ]);
+      
       Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
+        // Solo agregar si no está en la lista de exclusión y tiene valor
+        if (value !== undefined && value !== null && !paramsToExclude.has(key)) {
           queryParams.append(key, String(value));
         }
       });
+      
       const queryString = queryParams.toString();
       if (queryString) {
         url += `?${queryString}`;
@@ -111,7 +124,7 @@ export class INEClient {
    * DATOS_TABLA - Obtener datos para una tabla específica
    */
   async getDatosTabla(idTabla: string, params?: DatosTablaParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'DATOS_TABLA', idTabla, params);
+    const url = this.buildURL(idioma, 'DATOS_TABLA', idTabla, params, ['idTabla']);
     return this.get(url);
   }
 
@@ -119,7 +132,7 @@ export class INEClient {
    * DATOS_SERIE - Obtener datos para una serie específica
    */
   async getDatosSerie(idSerie: string, params?: DatosSerieParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'DATOS_SERIE', idSerie, params);
+    const url = this.buildURL(idioma, 'DATOS_SERIE', idSerie, params, ['idSerie']);
     return this.get(url);
   }
 
@@ -127,7 +140,7 @@ export class INEClient {
    * DATOS_METADATAOPERACION - Obtener datos de series usando filtros
    */
   async getDatosMetadataOperacion(idOperacion: string, params?: DatosMetadataOperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'DATOS_METADATAOPERACION', idOperacion, params);
+    const url = this.buildURL(idioma, 'DATOS_METADATAOPERACION', idOperacion, params, ['idOperacion']);
     return this.get(url);
   }
 
@@ -143,7 +156,7 @@ export class INEClient {
    * OPERACION - Obtener una operación específica
    */
   async getOperacion(idOperacion: string, params?: OperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'OPERACION', idOperacion, params);
+    const url = this.buildURL(idioma, 'OPERACION', idOperacion, params, ['idOperacion']);
     return this.get(url);
   }
 
@@ -159,7 +172,7 @@ export class INEClient {
    * VARIABLES_OPERACION - Obtener variables de una operación
    */
   async getVariablesOperacion(idOperacion: string, params?: VariablesOperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'VARIABLES_OPERACION', idOperacion, params);
+    const url = this.buildURL(idioma, 'VARIABLES_OPERACION', idOperacion, params, ['idOperacion']);
     return this.get(url);
   }
 
@@ -167,7 +180,7 @@ export class INEClient {
    * VALORES_VARIABLE - Obtener valores de una variable
    */
   async getValoresVariable(idVariable: string, params?: ValoresVariableParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'VALORES_VARIABLE', idVariable, params);
+    const url = this.buildURL(idioma, 'VALORES_VARIABLE', idVariable, params, ['idVariable']);
     return this.get(url);
   }
 
@@ -175,7 +188,7 @@ export class INEClient {
    * VALORES_VARIABLEOPERACION - Obtener valores de una variable en una operación
    */
   async getValoresVariableOperacion(idVariable: string, idOperacion: string, params?: ValoresVariableOperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'VALORES_VARIABLEOPERACION', `${idVariable}/${idOperacion}`, params);
+    const url = this.buildURL(idioma, 'VALORES_VARIABLEOPERACION', `${idVariable}/${idOperacion}`, params, ['idVariable', 'idOperacion']);
     return this.get(url);
   }
 
@@ -183,7 +196,7 @@ export class INEClient {
    * TABLAS_OPERACION - Obtener tablas de una operación
    */
   async getTablasOperacion(idOperacion: string, params?: TablasOperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'TABLAS_OPERACION', idOperacion, params);
+    const url = this.buildURL(idioma, 'TABLAS_OPERACION', idOperacion, params, ['idOperacion']);
     return this.get(url);
   }
 
@@ -191,7 +204,7 @@ export class INEClient {
    * GRUPOS_TABLA - Obtener grupos de una tabla
    */
   async getGruposTabla(idTabla: string, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'GRUPOS_TABLA', idTabla);
+    const url = this.buildURL(idioma, 'GRUPOS_TABLA', idTabla, undefined, ['idTabla']);
     return this.get(url);
   }
 
@@ -199,7 +212,7 @@ export class INEClient {
    * VALORES_GRUPOSTABLA - Obtener valores de un grupo de tabla
    */
   async getValoresGruposTabla(idTabla: string, idGrupo: string, params?: ValoresGruposTablaParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'VALORES_GRUPOSTABLA', `${idTabla}/${idGrupo}`, params);
+    const url = this.buildURL(idioma, 'VALORES_GRUPOSTABLA', `${idTabla}/${idGrupo}`, params, ['idTabla', 'idGrupo']);
     return this.get(url);
   }
 
@@ -207,7 +220,7 @@ export class INEClient {
    * SERIE - Obtener información de una serie
    */
   async getSerie(idSerie: string, params?: SerieParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'SERIE', idSerie, params);
+    const url = this.buildURL(idioma, 'SERIE', idSerie, params, ['idSerie']);
     return this.get(url);
   }
 
@@ -215,7 +228,7 @@ export class INEClient {
    * SERIES_OPERACION - Obtener series de una operación
    */
   async getSeriesOperacion(idOperacion: string, params?: SeriesOperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'SERIES_OPERACION', idOperacion, params);
+    const url = this.buildURL(idioma, 'SERIES_OPERACION', idOperacion, params, ['idOperacion']);
     return this.get(url);
   }
 
@@ -223,7 +236,7 @@ export class INEClient {
    * VALORES_SERIE - Obtener valores y variables que definen una serie
    */
   async getValoresSerie(idSerie: string, params?: ValoresSerieParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'VALORES_SERIE', idSerie, params);
+    const url = this.buildURL(idioma, 'VALORES_SERIE', idSerie, params, ['idSerie']);
     return this.get(url);
   }
 
@@ -231,7 +244,7 @@ export class INEClient {
    * SERIES_TABLA - Obtener series de una tabla
    */
   async getSeriesTabla(idTabla: string, params?: SeriesTablaParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'SERIES_TABLA', idTabla, params);
+    const url = this.buildURL(idioma, 'SERIES_TABLA', idTabla, params, ['idTabla']);
     return this.get(url);
   }
 
@@ -239,7 +252,7 @@ export class INEClient {
    * SERIE_METADATAOPERACION - Obtener series con filtros de metadata
    */
   async getSerieMetadataOperacion(idOperacion: string, params?: SerieMetadataOperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'SERIE_METADATAOPERACION', idOperacion, params);
+    const url = this.buildURL(idioma, 'SERIE_METADATAOPERACION', idOperacion, params, ['idOperacion']);
     return this.get(url);
   }
 
@@ -263,7 +276,7 @@ export class INEClient {
    * PUBLICACIONES_OPERACION - Obtener publicaciones de una operación
    */
   async getPublicacionesOperacion(idOperacion: string, params?: PublicacionesOperacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'PUBLICACIONES_OPERACION', idOperacion, params);
+    const url = this.buildURL(idioma, 'PUBLICACIONES_OPERACION', idOperacion, params, ['idOperacion']);
     return this.get(url);
   }
 
@@ -271,7 +284,7 @@ export class INEClient {
    * PUBLICACIONFECHA_PUBLICACION - Obtener fechas de publicación
    */
   async getPublicacionFechaPublicacion(idPublicacion: string, params?: PublicacionFechaPublicacionParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'PUBLICACIONFECHA_PUBLICACION', idPublicacion, params);
+    const url = this.buildURL(idioma, 'PUBLICACIONFECHA_PUBLICACION', idPublicacion, params, ['idPublicacion']);
     return this.get(url);
   }
 
@@ -287,7 +300,7 @@ export class INEClient {
    * CLASIFICACIONES_OPERACION - Obtener clasificaciones de una operación
    */
   async getClasificacionesOperacion(idOperacion: string, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'CLASIFICACIONES_OPERACION', idOperacion);
+    const url = this.buildURL(idioma, 'CLASIFICACIONES_OPERACION', idOperacion, undefined, ['idOperacion']);
     return this.get(url);
   }
 
@@ -295,7 +308,7 @@ export class INEClient {
    * VALORES_HIJOS - Obtener valores hijos en estructura jerárquica
    */
   async getValoresHijos(idVariable: string, idValor: string, params?: ValoresHijosParams, idioma: Idioma = 'ES') {
-    const url = this.buildURL(idioma, 'VALORES_HIJOS', `${idVariable}/${idValor}`, params);
+    const url = this.buildURL(idioma, 'VALORES_HIJOS', `${idVariable}/${idValor}`, params, ['idVariable', 'idValor']);
     return this.get(url);
   }
 }
