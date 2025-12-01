@@ -2,6 +2,22 @@
 
 Servidor MCP (Model Context Protocol) para consultar la API del Instituto Nacional de Estadística (INE) de España. Implementa soporte completo para JSON-RPC sobre HTTP y SSE (Server-Sent Events), optimizado para su uso con VS Code AI Toolkit.
 
+## ⚠️ Importante: Datos Disponibles
+
+**Este servidor solo proporciona acceso a las estadísticas del INE.** El INE NO incluye datos de criminalidad.
+
+**Tipos de datos disponibles:**
+- 📊 Demografía y población
+- 💰 Economía (IPC, PIB, mercado laboral)
+- 🏢 Empresas y comercio
+- 🏘️ Vivienda y construcción
+- 📚 Educación y sociedad
+- 🌾 Agricultura y medio ambiente
+
+Para estadísticas de criminalidad en España, consulta el [Portal Estadístico de Criminalidad del Ministerio del Interior](https://estadisticasdecriminalidad.ses.mir.es/).
+
+Ver la [guía completa de datos disponibles](./DATOS_DISPONIBLES.md) para más información.
+
 ## 🌟 Características
 
 - ✅ **Protocolo MCP completo**: Soporte para JSON-RPC y SSE

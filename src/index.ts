@@ -895,7 +895,7 @@ app.post('/mcp/v1', async (req: Request, res: Response) => {
       console.log(`MCP tools/call: ${name}`, args);
       
       if (!name) {
-        return res.status(400).json({
+        return res.status(200).json({
           jsonrpc: '2.0',
           error: { 
             code: -32602, 
