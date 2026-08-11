@@ -1,4 +1,3 @@
-import axios, { AxiosInstance } from 'axios';
 import type {
   Idioma,
   DatosTablaParams,
@@ -24,31 +23,58 @@ import type {
   INEResponse
 } from '../types/ine.types.js';
 
+const INE_BASE_URL = 'https://servicios.ine.es/wstempus/js';
+const REQUEST_TIMEOUT_MS = 25000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 500;
+
+interface CacheEntry {
+  expires: number;
+  value: unknown;
+}
+
 /**
- * Cliente para la API del INE
+ * Pequeña caché en memoria con TTL para reducir llamadas al INE,
+ * mejorar la velocidad de respuesta y evitar el rate-limiting.
+ */
+const responseCache = new Map<string, CacheEntry>();
+
+function cacheGet(key: string): unknown {
+  const entry = responseCache.get(key);
+  if (!entry) return undefined;
+  if (entry.expires < Date.now()) {
+    responseCache.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+
+function cacheSet(key: string, value: unknown): void {
+  // Evitar que la caché crezca sin límite
+  if (responseCache.size >= MAX_CACHE_ENTRIES) {
+    const oldest = responseCache.keys().next().value;
+    if (oldest !== undefined) {
+      responseCache.delete(oldest);
+    }
+  }
+  responseCache.set(key, { expires: Date.now() + CACHE_TTL_MS, value });
+}
+
+/**
+ * Cliente para la API del INE.
+ * Usa exclusivamente APIs web estándar (fetch, AbortController, URLSearchParams)
+ * por lo que funciona tanto en Node.js como en Cloudflare Workers.
  */
 export class INEClient {
-  private readonly baseURL = 'https://servicios.ine.es/wstempus/js';
-  private readonly client: AxiosInstance;
-
-  constructor() {
-    this.client = axios.create({
-      baseURL: this.baseURL,
-      timeout: 30000,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'MCP-INE-Server/1.0'
-      }
-    });
-  }
+  private readonly baseURL = INE_BASE_URL;
 
   /**
    * Construye la URL con parámetros, excluyendo parámetros que ya están en la ruta
    */
   private buildURL(
-    idioma: Idioma, 
-    funcion: string, 
-    input?: string, 
+    idioma: Idioma,
+    funcion: string,
+    input?: string,
     params?: Record<string, any>,
     excludeParams?: string[]
   ): string {
@@ -56,67 +82,107 @@ export class INEClient {
     if (input) {
       url += `/${input}`;
     }
-    
+
     if (params && Object.keys(params).length > 0) {
       const queryParams = new URLSearchParams();
       const paramsToExclude = new Set([
         'idioma', // Siempre excluir idioma (está en la ruta)
         ...(excludeParams || [])
       ]);
-      
+
       Object.entries(params).forEach(([key, value]) => {
         // Solo agregar si no está en la lista de exclusión y tiene valor
         if (value !== undefined && value !== null && !paramsToExclude.has(key)) {
           queryParams.append(key, String(value));
         }
       });
-      
+
       const queryString = queryParams.toString();
       if (queryString) {
         url += `?${queryString}`;
       }
     }
-    
+
     return url;
   }
 
   /**
-   * Realiza una petición GET a la API
+   * Realiza una petición GET a la API usando fetch estándar con timeout y caché.
+   * Nunca lanza excepciones: siempre devuelve INEResponse.
    */
   private async get<T>(url: string): Promise<INEResponse<T>> {
-    try {
-      const fullUrl = `${this.baseURL}${url}`;
-      console.log(`INE API Request: ${fullUrl}`);
-      const response = await this.client.get<T>(url);
+    const fullUrl = `${this.baseURL}${url}`;
+    const startedAt = Date.now();
+
+    const cached = cacheGet(fullUrl);
+    if (cached !== undefined) {
       return {
-        data: response.data,
-        success: true
+        data: cached as T,
+        success: true,
+        cached: true,
+        ms: Date.now() - startedAt
+      };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'MCP-INE-Server/1.0',
+          'Accept-Language': url.startsWith('/EN/') ? 'en' : 'es'
+        },
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Error del servidor INE (${response.status}). El servicio podría estar temporalmente no disponible.`;
+        if (response.status === 404) {
+          errorMessage = `Recurso no encontrado (404). La URL solicitada no existe: ${fullUrl}. ` +
+            `Verifica que el ID proporcionado sea correcto. ` +
+            `Usa 'ine_operaciones_disponibles' para listar operaciones disponibles, ` +
+            `o 'ine_tablas_operacion' para listar las tablas de una operación específica.`;
+        } else if (response.status === 400) {
+          errorMessage = `Solicitud incorrecta (400). Los parámetros enviados no son válidos: ${fullUrl}`;
+        } else if (response.status === 429) {
+          errorMessage = `Demasiadas solicitudes (429). El servidor INE ha limitado temporalmente las peticiones. Inténtalo de nuevo en unos segundos.`;
+        } else if (response.status >= 500) {
+          errorMessage = `Error del servidor INE (${response.status}). El servicio podría estar temporalmente no disponible.`;
+        }
+
+        return {
+          data: null as any,
+          success: false,
+          error: errorMessage,
+          ms: Date.now() - startedAt
+        };
+      }
+
+      const data = await response.json() as T;
+      cacheSet(fullUrl, data);
+      return {
+        data,
+        success: true,
+        cached: false,
+        ms: Date.now() - startedAt
       };
     } catch (error: any) {
-      const fullUrl = `${this.baseURL}${url}`;
-      let errorMessage = error.message || 'Error desconocido';
-      
-      // Proporcionar mensajes de error más útiles
-      if (error.response?.status === 404) {
-        errorMessage = `Recurso no encontrado (404). La URL solicitada no existe: ${fullUrl}. ` +
-          `Verifica que el ID proporcionado sea correcto. ` +
-          `Usa 'ine_operaciones_disponibles' para listar operaciones disponibles, ` +
-          `o 'ine_tablas_operacion' para listar las tablas de una operación específica.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Solicitud incorrecta (400). Los parámetros enviados no son válidos: ${fullUrl}`;
-      } else if (error.response?.status >= 500) {
-        errorMessage = `Error del servidor INE (${error.response.status}). El servicio podría estar temporalmente no disponible.`;
-      } else if (error.code === 'ECONNABORTED') {
-        errorMessage = `Tiempo de espera agotado. El servidor INE no respondió en 30 segundos.`;
-      }
-      
-      console.error(`INE API Error: ${errorMessage}`);
-      
+      const isTimeout = error?.name === 'AbortError' || error?.name === 'TimeoutError';
+      const errorMessage = isTimeout
+        ? `Tiempo de espera agotado. El servidor INE no respondió en ${Math.round(REQUEST_TIMEOUT_MS / 1000)} segundos: ${fullUrl}`
+        : (error?.cause?.message || error?.message || 'Error desconocido');
+
       return {
         data: null as any,
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        ms: Date.now() - startedAt
       };
+    } finally {
+      clearTimeout(timer);
     }
   }
 

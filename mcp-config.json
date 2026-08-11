@@ -1,22 +1,28 @@
 {
   "mcpServers": {
-    "ine-server": {
-      "command": "node",
-      "args": ["dist/index.js", "--stdio"],
-      "description": "Servidor MCP para consultar la API del INE (Instituto Nacional de Estadística de España)",
-      "env": {}
+    "ine-remote-http": {
+      "type": "remote",
+      "url": "https://mcp-ine.manalejandro.com/mcp",
+      "description": "Servidor MCP INE en Cloudflare Workers - JSON-RPC (Streamable HTTP)",
+      "enabled": false
     },
-    "ine-server-http": {
+    "ine-remote-sse": {
+      "url": "https://mcp-ine.manalejandro.com/sse",
+      "transport": "sse",
+      "description": "Servidor MCP INE en Cloudflare Workers - SSE (Server-Sent Events)",
+      "enabled": false
+    },
+    "ine-local-http": {
       "url": "http://localhost:3000/mcp/v1",
       "transport": "http",
-      "description": "Servidor MCP INE vía HTTP JSON-RPC",
-      "env": {}
+      "description": "Servidor MCP INE local - HTTP JSON-RPC (npm start)",
+      "enabled": false
     },
-    "ine-server-sse": {
-      "url": "http://localhost:3001/sse",
-      "transport": "sse",
-      "description": "Servidor MCP INE vía SSE (Server-Sent Events)",
-      "env": {}
+    "ine-local-stdio": {
+      "command": "node",
+      "args": ["dist/index.js", "--stdio"],
+      "description": "Servidor MCP INE local - stdio",
+      "enabled": false
     }
   }
 }

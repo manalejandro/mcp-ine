@@ -103,6 +103,10 @@ export interface INEResponse<T = any> {
   data: T;
   success: boolean;
   error?: string;
+  /** true si la respuesta se sirvió desde la caché en memoria */
+  cached?: boolean;
+  /** tiempo (ms) que tardó la petición en completarse */
+  ms?: number;
 }
 
 export interface Operacion {

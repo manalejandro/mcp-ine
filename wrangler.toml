@@ -1,0 +1,13 @@
+name = "mcp-ine"
+main = "dist/worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = false
+
+# Dominio personalizado del Worker
+routes = [
+  { pattern = "mcp-ine.manalejandro.com", custom_domain = true }
+]
+
+# El servidor no necesita secretos; el tráfico saliente al INE es HTTPS público.
+# Si un día el INE exige una API key, añádela como secreto:
+#   npx wrangler secret put INE_API_KEY

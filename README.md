@@ -1,388 +1,280 @@
 # MCP INE Server
 
-Servidor MCP (Model Context Protocol) para consultar la API del Instituto Nacional de Estadística (INE) de España. Implementa soporte completo para JSON-RPC sobre HTTP y SSE (Server-Sent Events), optimizado para su uso con VS Code AI Toolkit.
+Servidor **Model Context Protocol (MCP)** para consultar los datos estadísticos del
+**Instituto Nacional de Estadística (INE)** de España, listo para desplegar en
+**Cloudflare Workers** y usar con **opencode**, Claude Desktop, VS Code AI Toolkit,
+Cursor o cualquier cliente MCP.
 
-## ⚠️ Importante: Datos Disponibles
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/manalejandro/mcp-ine)
 
-**Este servidor solo proporciona acceso a las estadísticas del INE.** El INE NO incluye datos de criminalidad.
+---
 
-**Tipos de datos disponibles:**
-- 📊 Demografía y población
-- 💰 Economía (IPC, PIB, mercado laboral)
-- 🏢 Empresas y comercio
-- 🏘️ Vivienda y construcción
-- 📚 Educación y sociedad
-- 🌾 Agricultura y medio ambiente
+## ✨ Características
 
-Para estadísticas de criminalidad en España, consulta el [Portal Estadístico de Criminalidad del Ministerio del Interior](https://estadisticasdecriminalidad.ses.mir.es/).
+- **24 herramientas MCP** que cubren las 24 funciones de la API pública del INE (`servicios.ine.es/wstempus/js`).
+- **Desplegable en Cloudflare Workers** (sin servidor, sin coste fijo, TLS automático).
+- **Dos transportes MCP**:
+  - **Streamable HTTP / JSON-RPC** → `POST /mcp` (recomendado para opencode).
+  - **SSE clásico** → `GET /sse` (compatible con Claude Desktop, Cursor, etc.).
+- **Cero errores de timeout**: cada petición recibe siempre una respuesta inmediata
+  (JSON, SSE o `202 Accepted` para notificaciones). El runtime de Workers nunca cancela
+  peticiones colgadas.
+- **Timeout de 25 s y caché en memoria (10 min)** para el acceso al INE: respuestas más
+  rápidas y menos riesgo de rate-limiting.
+- **Sin dependencias de Node en el Worker**: usa solo APIs web estándar (`fetch`, `ReadableStream`, `AbortController`).
+- También conserva un **servidor Node/Express local** para desarrollo y modo `stdio`.
 
-Ver la [guía completa de datos disponibles](./DATOS_DISPONIBLES.md) para más información.
+---
 
-## 🌟 Características
+## 🌐 Datos disponibles
 
-- ✅ **Protocolo MCP completo**: Soporte para JSON-RPC y SSE
-- ✅ **24 herramientas MCP**: Acceso a todos los endpoints de la API del INE
-- ✅ **Documentación Swagger**: API REST documentada con OpenAPI 3.0
-- ✅ **TypeScript**: Código completamente tipado
-- ✅ **VS Code AI Toolkit**: Configuración lista para usar
-- ✅ **Múltiples transportes**: HTTP JSON-RPC, SSE y stdio
+El INE ofrece datos oficiales de España organizados en **operaciones** estadísticas:
 
-## 📋 Requisitos
+| Área | Ejemplos |
+|---|---|
+| 📊 Demografía y población | Cifras de población, censos, migraciones |
+| 💰 Economía | IPC (inflación), PIB, comercio exterior, empresas |
+| 👷 Empleo | EPA (paro y empleo), salarios, condiciones de trabajo |
+| 🏢 Empresas y comercio | Sociedades mercantiles, hipotecas, turismo |
+| 📚 Educación y sociedad | Condiciones de vida (ECV), educación, salud |
+| 🌾 Agricultura y medio ambiente | Agricultura, energía, medio ambiente |
 
-- Node.js 18 o superior
-- npm o yarn
+> **Importante**: el INE **no** incluye datos de criminalidad. Para eso consulta el
+> [Portal Estadístico de Criminalidad del Ministerio del Interior](https://estadisticasdecriminalidad.ses.mir.es/).
 
-## 🚀 Instalación
+Operaciones más usadas: `IPC`, `EPA`, `PIB` (o `CNE`), `CIFRAS_POB`, `ECV`, `DEFUNCIONES`, `NACIMIENTOS`, `COMERCIO_EXT`, `HIPOTECAS`.
 
-### Instalación rápida
+---
+
+## 🚀 Despliegue en Cloudflare Workers
+
+### Opción A — Botón (1 clic)
+
+Pulsa el botón de arriba y sigue el asistente de Cloudflare. Necesitarás el repo
+público y una cuenta de Cloudflare gratuita.
+
+### Opción B — CLI con `wrangler`
 
 ```bash
-chmod +x install.sh
-./install.sh
-```
+# 1. Requisitos: Node 18+, cuenta de Cloudflare y autenticación
+npm install -g wrangler
+npx wrangler login
 
-### Instalación manual
-
-```bash
-# Instalar dependencias
+# 2. Instalar dependencias y compilar
 npm install
-
-# Compilar TypeScript
 npm run build
+
+# 3. Verificar localmente antes de desplegar (http://localhost:8787)
+npm run dev:worker
+
+# 4. Configurar el dominio personalizado (edita wrangler.toml)
+#    routes = [ { pattern = "mcp-ine.manalejandro.com", custom_domain = true } ]
+
+# 5. Desplegar
+npm run deploy
 ```
 
-## 🎮 Uso
-
-### Modo HTTP JSON-RPC (Principal)
-
-Este es el modo recomendado para AI Toolkit:
+`npm run deploy` ejecuta `wrangler deploy`, que publica el Worker y enlaza el
+dominio personalizado. Después puedes comprobar:
 
 ```bash
-npm start
-# o
-./start-server.sh
+curl https://mcp-ine.manalejandro.com/health
 ```
 
-El servidor estará disponible en:
-- **Endpoint MCP**: `http://localhost:3000/mcp/v1`
-- **Swagger UI**: `http://localhost:3000/api-docs`
-- **Health Check**: `http://localhost:3000/health`
+---
 
-### Modo SSE (Server-Sent Events)
+## 🔌 Configuración en tu cliente MCP
 
-Para streaming de eventos:
-
-```bash
-npm run start:sse
-# o
-./start-sse.sh
-```
-
-El servidor SSE estará en:
-- **Endpoint SSE**: `http://localhost:3001/sse`
-- **Health Check**: `http://localhost:3001/health`
-
-### Modo stdio
-
-Para integración directa:
-
-```bash
-node dist/index.js --stdio
-```
-
-## 🔧 Configuración en VS Code AI Toolkit
-
-### Opción 1: HTTP JSON-RPC (Recomendado)
-
-1. Abre VS Code
-2. Instala la extensión **AI Toolkit**
-3. Inicia el servidor: `npm start`
-4. En AI Toolkit, configura el servidor MCP:
+### opencode (JSON-RPC / Streamable HTTP)
 
 ```json
 {
-  "mcpServers": {
-    "ine-server": {
-      "url": "http://localhost:3000/mcp/v1",
-      "transport": "http",
-      "description": "API del INE España"
+  "mcp": {
+    "ine": {
+      "type": "remote",
+      "url": "https://mcp-ine.manalejandro.com/mcp",
+      "enabled": true
     }
   }
 }
 ```
 
-### Opción 2: SSE
+### Claude Desktop / Cursor / AI Toolkit (SSE)
 
 ```json
 {
   "mcpServers": {
-    "ine-server-sse": {
-      "url": "http://localhost:3001/sse",
-      "transport": "sse",
-      "description": "API del INE España (SSE)"
+    "ine": {
+      "url": "https://mcp-ine.manalejandro.com/sse",
+      "transport": "sse"
     }
   }
 }
 ```
 
-### Opción 3: stdio
+### Configuración local (desarrollo)
 
 ```json
 {
   "mcpServers": {
-    "ine-server-stdio": {
-      "command": "node",
-      "args": ["dist/index.js", "--stdio"],
-      "cwd": "/ruta/a/mcp-ine",
-      "description": "API del INE España (stdio)"
-    }
+    "ine": { "url": "http://localhost:3000/mcp/v1", "transport": "http" }
   }
 }
 ```
 
-## 🛠️ Herramientas MCP Disponibles
+---
 
-El servidor proporciona 24 herramientas MCP para interactuar con la API del INE:
+## 🔗 URLs del servicio desplegado
 
-### Datos Estadísticos
+| Recurso | URL |
+|---|---|
+| MCP JSON-RPC | `https://mcp-ine.manalejandro.com/mcp` |
+| MCP SSE | `https://mcp-ine.manalejandro.com/sse` |
+| Health check | `https://mcp-ine.manalejandro.com/health` |
+| Página de información | `https://mcp-ine.manalejandro.com/` |
+| API REST | `https://mcp-ine.manalejandro.com/api/...` |
 
-- **`ine_datos_tabla`**: Obtiene datos de una tabla específica
-- **`ine_datos_serie`**: Obtiene datos de una serie temporal
-- **`ine_datos_metadata_operacion`**: Datos con filtros de metadata
+---
+
+## 🛠️ Herramientas MCP (24)
+
+### Datos estadísticos
+- `ine_datos_tabla` — datos de una tabla (ej: `50902`)
+- `ine_datos_serie` — datos históricos de una serie (ej: `IPC251856`)
+- `ine_datos_metadata_operacion` — datos de series con filtros avanzados (`g1`..`g5`)
 
 ### Operaciones
+- `ine_operaciones_disponibles` — lista todas las operaciones
+- `ine_operacion` — metadatos de una operación (ej: `IPC`)
 
-- **`ine_operaciones_disponibles`**: Lista todas las operaciones estadísticas
-- **`ine_operacion`**: Información de una operación específica
+### Variables y valores
+- `ine_variables`, `ine_variables_operacion`
+- `ine_valores_variable`, `ine_valores_variable_operacion`
+- `ine_valores_hijos` — valores jerárquicos (ej: provincias de una CCAA)
 
-### Variables y Valores
-
-- **`ine_variables`**: Lista todas las variables disponibles
-- **`ine_variables_operacion`**: Variables de una operación
-- **`ine_valores_variable`**: Valores de una variable
-- **`ine_valores_variable_operacion`**: Valores en contexto de operación
-- **`ine_valores_hijos`**: Valores jerárquicos (ej: provincias de una CA)
-
-### Series Temporales
-
-- **`ine_serie`**: Información de una serie
-- **`ine_series_operacion`**: Series de una operación
-- **`ine_series_tabla`**: Series de una tabla
-- **`ine_serie_metadata_operacion`**: Búsqueda con filtros
-- **`ine_valores_serie`**: Variables que definen una serie
+### Series temporales
+- `ine_serie`, `ine_series_operacion`, `ine_series_tabla`
+- `ine_serie_metadata_operacion`, `ine_valores_serie`
 
 ### Tablas
-
-- **`ine_tablas_operacion`**: Tablas de una operación
-- **`ine_grupos_tabla`**: Grupos de una tabla
-- **`ine_valores_grupos_tabla`**: Valores de un grupo
+- `ine_tablas_operacion`, `ine_grupos_tabla`, `ine_valores_grupos_tabla`
 
 ### Metadatos
+- `ine_periodicidades`, `ine_publicaciones`, `ine_publicaciones_operacion`
+- `ine_publicacion_fecha_publicacion`, `ine_clasificaciones`, `ine_clasificaciones_operacion`
 
-- **`ine_periodicidades`**: Periodicidades disponibles
-- **`ine_publicaciones`**: Lista de publicaciones
-- **`ine_publicaciones_operacion`**: Publicaciones de una operación
-- **`ine_publicacion_fecha_publicacion`**: Fechas de publicación
-- **`ine_clasificaciones`**: Clasificaciones disponibles
-- **`ine_clasificaciones_operacion`**: Clasificaciones de una operación
+---
 
-## 📖 Ejemplos de Uso
+## 📖 Ejemplos de uso
 
-### Ejemplo 1: Obtener datos del IPC
+### Con curl (JSON-RPC)
 
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "ine_datos_serie",
-    "arguments": {
-      "idSerie": "IPC251856",
-      "nult": 12,
-      "tip": "A"
-    }
-  },
-  "id": 1
-}
+```bash
+# Handshake
+curl -X POST https://mcp-ine.manalejandro.com/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05"},"id":1}'
+
+# Listar herramientas
+curl -X POST https://mcp-ine.manalejandro.com/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":2}'
+
+# Últimos datos del IPC
+curl -X POST https://mcp-ine.manalejandro.com/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"ine_datos_serie","arguments":{"idSerie":"IPC251856","nult":12,"tip":"A"}},"id":3}'
 ```
 
-### Ejemplo 2: Listar operaciones disponibles
+### Con curl (SSE)
 
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "ine_operaciones_disponibles",
-    "arguments": {
-      "idioma": "ES",
-      "geo": 0
-    }
-  },
-  "id": 2
-}
+```bash
+curl -N https://mcp-ine.manalejandro.com/sse
+#   → event: endpoint
+#     data: /message?sessionId=<id>
 ```
 
-### Ejemplo 3: Obtener variables del IPC
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "ine_variables_operacion",
-    "arguments": {
-      "idOperacion": "IPC"
-    }
-  },
-  "id": 3
-}
-```
-
-### Desde AI Toolkit (Chat)
-
-Una vez configurado en AI Toolkit, puedes hacer preguntas como:
+### Con opencode (chat)
 
 ```
 ¿Cuál es el último valor del IPC en España?
-
 ¿Qué operaciones estadísticas tiene el INE sobre población?
-
-Dame los datos de la tabla 50902 de los últimos 5 períodos
-
+Dame los datos de la tabla 50902 de los últimos 5 periodos
 ¿Cuáles son las variables disponibles para la operación IPC?
 ```
 
-## 🌐 API REST
+---
 
-Además del protocolo MCP, el servidor expone endpoints REST:
-
-- `GET /api/datos-tabla/:idTabla` - Datos de tabla
-- `GET /api/datos-serie/:idSerie` - Datos de serie
-- `GET /api/operaciones-disponibles` - Listar operaciones
-- `GET /api/operacion/:idOperacion` - Info de operación
-- `GET /api/variables` - Listar variables
-- `GET /api/variables-operacion/:idOperacion` - Variables de operación
-- `GET /api/series-operacion/:idOperacion` - Series de operación
-- `GET /api/tablas-operacion/:idOperacion` - Tablas de operación
-
-Documentación completa en: `http://localhost:3000/api-docs`
-
-## 📝 Parámetros Comunes
-
-### Idioma
-- `ES`: Español (por defecto)
-- `EN`: Inglés
-
-### Nivel de Detalle (det)
-- `0`: Básico
-- `1`: Medio
-- `2`: Completo
-
-### Tipo de Respuesta (tip)
-- `A`: Amigable (legible)
-- `M`: Con metadatos
-- `AM`: Amigable con metadatos
-
-### Periodicidad (p)
-- `1`: Mensual
-- `3`: Trimestral
-- `6`: Semestral
-- `12`: Anual
-
-## 🔍 Ejemplos de Consultas desde curl
+## 🐛 Desarrollo local
 
 ```bash
-# Obtener últimos datos del IPC
-curl -X POST http://localhost:3000/mcp/v1 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "ine_datos_serie",
-      "arguments": {"idSerie": "IPC251856", "nult": 1}
-    },
-    "id": 1
-  }'
-
-# Listar herramientas disponibles
-curl -X POST http://localhost:3000/mcp/v1 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/list",
-    "params": {},
-    "id": 1
-  }'
+npm install        # instalar dependencias (compila en prepare)
+npm start          # servidor HTTP JSON-RPC en http://localhost:3000
+npm run dev        # con recarga automática (tsx watch)
+node dist/index.js --stdio   # modo stdio
+npm run start:sse  # servidor SSE en http://localhost:3001
+npm run dev:worker # Worker local con wrangler (http://localhost:8787)
+npm run build      # compilar TypeScript
 ```
 
-## 📚 Recursos
+---
 
-- [API del INE - Documentación oficial](https://www.ine.es/dyngs/DataLab/manual.html?cid=45)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [VS Code AI Toolkit](https://marketplace.visualstudio.com/items?itemName=ms-windows-ai-studio.windows-ai-studio)
-
-## 🛡️ Estructura del Proyecto
+## 🗂️ Estructura del proyecto
 
 ```
 mcp-ine/
 ├── src/
-│   ├── index.ts              # Servidor principal (HTTP JSON-RPC)
-│   ├── server-sse.ts         # Servidor SSE
-│   ├── swagger.ts            # Especificación OpenAPI
-│   ├── types/
-│   │   └── ine.types.ts      # Tipos TypeScript
-│   └── services/
-│       └── ine-client.ts     # Cliente HTTP para API INE
-├── dist/                     # Código compilado
+│   ├── worker.ts              # Entrada del Cloudflare Worker (MCP JSON-RPC + SSE)
+│   ├── mcp.ts                 # Lógica MCP compartida (dispatch de herramientas)
+│   ├── index.ts               # Servidor Node/Express local (JSON-RPC)
+│   ├── server-sse.ts          # Servidor Node/Express SSE local
+│   ├── services/
+│   │   └── ine-client.ts      # Cliente de la API del INE (fetch estándar + caché)
+│   ├── tools.ts               # Definición de las 24 herramientas
+│   ├── types/ine.types.ts     # Tipos TypeScript
+│   ├── swagger.ts             # Especificación OpenAPI (servidor local)
+│   └── examples.ts            # Ejemplos ejecutables
+├── test/
+│   └── smoke.mjs              # Pruebas de protocolo y datos reales del INE
+├── wrangler.toml              # Configuración de Cloudflare Workers
+├── mcp-config.json            # Configuración MCP para clientes
+├── API.txt                    # Referencia oficial de la API del INE
 ├── package.json
-├── tsconfig.json
-├── mcp-config.json           # Configuración para AI Toolkit
-├── install.sh                # Script de instalación
-├── start-server.sh           # Iniciar servidor HTTP
-├── start-sse.sh              # Iniciar servidor SSE
-└── README.md
+└── tsconfig.json
 ```
 
-## 🐛 Troubleshooting
+---
 
-### El servidor no inicia
+## 🧪 Pruebas
 
 ```bash
-# Limpiar y reinstalar
-npm run clean
-rm -rf node_modules package-lock.json
-npm install
-npm run build
+# Protocolo (initialize, tools/list, ping, SSE, errores) — sin red
+node test/smoke.mjs
+
+# Además, consultas reales a la API del INE
+node test/smoke.mjs --live
 ```
 
-### Error de conexión en AI Toolkit
+Las pruebas cubren: handshake, negociación de versión del protocolo, listado de las
+24 herramientas, llamadas a herramientas reales (IPC, operaciones, variables,
+jerarquías…), transportes JSON-RPC y SSE, y respuestas de error (nunca cuelgan).
 
-1. Verifica que el servidor esté corriendo: `http://localhost:3000/health`
-2. Comprueba que no haya otro proceso usando el puerto 3000
-3. Revisa la configuración MCP en AI Toolkit
+---
 
-### Errores de TypeScript
+## 📚 Recursos
 
-```bash
-# Reinstalar tipos
-npm install --save-dev @types/node @types/express
-npm run build
-```
+- [API del INE — documentación oficial](https://www.ine.es/dyngs/DataLab/manual.html?cid=45)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/)
+- [Documentación de opencode sobre MCP](https://opencode.ai/docs/mcp-servers/)
+
+---
 
 ## 📄 Licencia
 
 MIT
 
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Por favor, abre un issue o pull request.
-
-## 📧 Soporte
-
-Para reportar problemas o sugerencias, abre un issue en el repositorio.
-
 ---
 
-Desarrollado con ❤️ para facilitar el acceso a los datos estadísticos del INE de España.
+Desarrollado para facilitar el acceso a los datos estadísticos del **INE de España**
+mediante el protocolo **MCP**.

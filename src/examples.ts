@@ -3,26 +3,28 @@
  * Ejecutar con: node dist/examples.js
  */
 
-import axios from 'axios';
-
-const MCP_ENDPOINT = 'http://localhost:3000/mcp/v1';
+const MCP_ENDPOINT = process.env.MCP_ENDPOINT || 'http://localhost:3000/mcp/v1';
 
 /**
- * Función helper para llamar al servidor MCP
+ * Función helper para llamar al servidor MCP usando fetch estándar
  */
 async function callMCPTool(toolName: string, args: any = {}) {
   try {
-    const response = await axios.post(MCP_ENDPOINT, {
-      jsonrpc: '2.0',
-      method: 'tools/call',
-      params: {
-        name: toolName,
-        arguments: args
-      },
-      id: Date.now()
+    const response = await fetch(MCP_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: {
+          name: toolName,
+          arguments: args
+        },
+        id: Date.now()
+      })
     });
 
-    return response.data;
+    return (await response.json()) as any;
   } catch (error: any) {
     console.error(`Error llamando a ${toolName}:`, error.message);
     return null;
@@ -34,7 +36,7 @@ async function callMCPTool(toolName: string, args: any = {}) {
  */
 async function ejemplo1_datosIPC() {
   console.log('\n📊 Ejemplo 1: Últimos datos del IPC\n');
-  
+
   const result = await callMCPTool('ine_datos_serie', {
     idSerie: 'IPC251856',
     nult: 12,
@@ -52,7 +54,7 @@ async function ejemplo1_datosIPC() {
  */
 async function ejemplo2_operaciones() {
   console.log('\n📋 Ejemplo 2: Operaciones Disponibles\n');
-  
+
   const result = await callMCPTool('ine_operaciones_disponibles', {
     idioma: 'ES',
     geo: 0,
@@ -74,7 +76,7 @@ async function ejemplo2_operaciones() {
  */
 async function ejemplo3_variablesIPC() {
   console.log('\n🏷️ Ejemplo 3: Variables de la Operación IPC\n');
-  
+
   const result = await callMCPTool('ine_variables_operacion', {
     idOperacion: 'IPC',
     idioma: 'ES'
@@ -94,7 +96,7 @@ async function ejemplo3_variablesIPC() {
  */
 async function ejemplo4_datosTabla() {
   console.log('\n📈 Ejemplo 4: Datos de Tabla 50902\n');
-  
+
   const result = await callMCPTool('ine_datos_tabla', {
     idTabla: '50902',
     nult: 3,
@@ -114,7 +116,7 @@ async function ejemplo4_datosTabla() {
  */
 async function ejemplo5_infoOperacion() {
   console.log('\n📖 Ejemplo 5: Información de la Operación IPC\n');
-  
+
   const result = await callMCPTool('ine_operacion', {
     idOperacion: 'IPC',
     det: 2,
@@ -133,7 +135,7 @@ async function ejemplo5_infoOperacion() {
  */
 async function ejemplo6_seriesConFiltros() {
   console.log('\n🔍 Ejemplo 6: Series del IPC con Filtros\n');
-  
+
   const result = await callMCPTool('ine_datos_metadata_operacion', {
     idOperacion: 'IPC',
     p: 1, // Periodicidad mensual
@@ -156,19 +158,24 @@ async function ejemplo6_seriesConFiltros() {
  */
 async function ejemplo7_listarHerramientas() {
   console.log('\n🛠️ Ejemplo 7: Herramientas MCP Disponibles\n');
-  
+
   try {
-    const response = await axios.post(MCP_ENDPOINT, {
-      jsonrpc: '2.0',
-      method: 'tools/list',
-      params: {},
-      id: 1
+    const response = await fetch(MCP_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'tools/list',
+        params: {},
+        id: 1
+      })
     });
 
-    const tools = response.data.result.tools;
-    console.log(`Total de herramientas: ${tools.length}\n`);
-    
-    tools.forEach((tool: any) => {
+    const data: any = await response.json();
+    const listado = data.result.tools;
+    console.log(`Total de herramientas: ${listado.length}\n`);
+
+    listado.forEach((tool: any) => {
       console.log(`- ${tool.name}`);
       console.log(`  ${tool.description}`);
       console.log('');
@@ -183,7 +190,7 @@ async function ejemplo7_listarHerramientas() {
  */
 async function ejemplo8_periodicidades() {
   console.log('\n⏰ Ejemplo 8: Periodicidades Disponibles\n');
-  
+
   const result = await callMCPTool('ine_periodicidades', {
     idioma: 'ES'
   });
@@ -204,12 +211,14 @@ async function ejecutarTodos() {
   console.log('='.repeat(60));
   console.log('  EJEMPLOS DE USO DEL MCP INE SERVER');
   console.log('='.repeat(60));
-  console.log('\n⚠️  Asegúrate de que el servidor esté corriendo en el puerto 3000');
-  console.log('   Comando: npm start\n');
+  console.log(`\n⚠️  Asegúrate de que el servidor esté corriendo en el puerto 3000`);
+  console.log('   Comando: npm start (o npm run dev:worker para probar el Worker)\n');
 
   // Verificar que el servidor esté activo
   try {
-    await axios.get('http://localhost:3000/health');
+    const healthUrl = MCP_ENDPOINT.replace(/\/mcp.*$/, '/health');
+    const res = await fetch(healthUrl);
+    if (!res.ok) throw new Error(`status ${res.status}`);
     console.log('✅ Servidor MCP INE activo\n');
   } catch (error) {
     console.error('❌ Error: El servidor no está activo. Inicia el servidor con: npm start');

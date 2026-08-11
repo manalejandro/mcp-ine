@@ -9,8 +9,8 @@ export const swaggerSpec = {
     version: '1.0.0',
     description: 'Servidor MCP para consultar la API del Instituto Nacional de Estadística (INE) de España',
     contact: {
-      name: 'API Support',
-      url: 'https://github.com/your-repo/mcp-ine-server'
+      name: 'MCP INE Server',
+      url: 'https://github.com/manalejandro/mcp-ine'
     },
     license: {
       name: 'MIT',
@@ -18,6 +18,10 @@ export const swaggerSpec = {
     }
   },
   servers: [
+    {
+      url: 'https://mcp-ine.manalejandro.com',
+      description: 'Producción (Cloudflare Workers)'
+    },
     {
       url: 'http://localhost:3000',
       description: 'Servidor de desarrollo'
